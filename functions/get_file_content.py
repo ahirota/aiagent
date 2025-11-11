@@ -1,6 +1,8 @@
 # get_file_content.py
 import os
 from config import MAX_CHARS
+from google import genai
+from google.genai import types
 
 def get_file_content(working_directory, file_path):
     abs_working_dir = os.path.abspath(working_directory)
@@ -21,10 +23,25 @@ def get_file_content(working_directory, file_path):
 
         with open(abs_working_file, "r") as f:
             file_content_string = f.read(MAX_CHARS)
-            
+
         if truncated:
             file_content_string += f'[...File "{file_path}" truncated at 10000 characters].'
 
         return file_content_string
     except Exception as e:
         return f'Error reading file "{file_path}": {e}'
+    
+
+schema_get_file_content = types.FunctionDeclaration(
+    name="get_file_content",
+    description="Read file in the specified directory, truncating the text (with additional note) if it exceeds maximum character limit, constrained to the working directory.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "file_path": types.Schema(
+                type=types.Type.STRING,
+                description="The file path to read from, relative to the working directory. If not provided, provide message asking user to include this as a required field.",
+            ),
+        },
+    ),
+)
