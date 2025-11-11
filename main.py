@@ -1,11 +1,14 @@
+# System Imports
 import os, sys
 from dotenv import load_dotenv
+
+# GenAI Imports
 from google import genai
 from google.genai import types
-from functions.get_files_info import schema_get_files_info
-from functions.get_file_content import schema_get_file_content
-from functions.write_file import schema_write_file
-from functions.run_python_file import schema_run_python_file
+
+# Functional Imports
+from prompts import system_prompt
+from call_function import available_functions, call_function
 
 def main():
     # Load and set up GenAI Client
@@ -14,19 +17,21 @@ def main():
     client = genai.Client(api_key=api_key)
 
     # Check and Validate User Input
-    args = sys.argv[1:]
-    v_flag = "--verbose" in args 
-    if v_flag:
-        args.remove("--verbose")
+    verbose_flag = "--verbose" in sys.argv[1:]
+    args = []
+    for arg in sys.argv[1:]:
+        # Remove ALL flags where they appear
+        if not arg.startswith('--'):
+            args.append(arg)
 
-    if len(args) == 0:
-        print("Error: No Prompt Detected.")
+    # Error Message and exit if prompt is empty or contains ONLY flags
+    if not args:
+        print('Error: No Prompt Detected.')
         print('\nUsage: python main.py "your prompt here"')
         print('Example: python main.py "How do I build a calculator app?"')
-        if v_flag:
-            print("""\nThe "--verbose" flag adds additional User Information to the response of this agent, and is not sufficient as a User Prompt.
-Information includes: the user's prompt, as well as remaining prompt/response tokens from using this API.
-                  """)
+        if verbose_flag:
+            print('\nThe "--verbose" flag adds additional User Information to the response of this agent, and is not sufficient as a User Prompt.')
+            print('Information includes: the user\'s prompt, as well as remaining prompt/response tokens from using this API.')
         sys.exit(1)
 
     # Build User Prompt from Input
@@ -35,29 +40,15 @@ Information includes: the user's prompt, as well as remaining prompt/response to
        types.Content(role="user", parts=[types.Part(text=user_prompt)]),
     ]
 
-    # Set up GenAI Client prompt and Functions
-    system_prompt = """
-You are a helpful AI coding agent.
+    # If Verbose, State User Prompt
+    if verbose_flag:
+        print(f"User prompt: {user_prompt}")
 
-When a user asks a question or makes a request, make a function call plan. You can perform the following operations:
+    # Generate Content
+    generate_content(client, messages, verbose_flag)
 
-- List files and directories
-- Read file contents
-- Write or overwrite files
-- Execute Python files with optional arguments
 
-All paths you provide should be relative to the working directory. You do not need to specify the working directory in your function calls as it is automatically injected for security reasons.
-"""
-
-    available_functions = types.Tool(
-        function_declarations=[
-            schema_get_files_info,
-            schema_get_file_content,
-            schema_write_file,
-            schema_run_python_file
-        ]
-    )
-    
+def generate_content(client, messages, verbose):
     # Get Response from GenAI
     response = client.models.generate_content(
         model='gemini-2.0-flash-001', 
@@ -68,15 +59,22 @@ All paths you provide should be relative to the working directory. You do not ne
     )
 
     # Print Response
-    if v_flag:
-        print(f"User prompt: {user_prompt}")
+    # Verbose Flag Details
+    if verbose:
         print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
         print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
+    
+    # Check for Function Calls and Execute
     if response.function_calls:
         for function_call_part in response.function_calls:
-            print(f"Calling function: {function_call_part.name}({function_call_part.args})")
+            function_response = call_function(function_call_part, verbose)
+            if not function_response.parts[0].function_response.response:
+                raise Exception("")
+            if verbose:
+                print(f"-> {function_response.parts[0].function_response.response}")
+    # Print Response only if No Calls (Otherwise response will contain non-text parts and print an error)
     else:
-        print(response.text)
+        print(response.text)    
 
 
 if __name__ == "__main__":
