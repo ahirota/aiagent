@@ -11,3 +11,4 @@ wheels/
 
 # Self
 .env
+*.txt
