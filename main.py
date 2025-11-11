@@ -9,6 +9,7 @@ from google.genai import types
 # Functional Imports
 from prompts import system_prompt
 from call_function import available_functions, call_function
+from config import MAX_RUN_COUNT
 
 def main():
     # Load and set up GenAI Client
@@ -44,8 +45,23 @@ def main():
     if verbose_flag:
         print(f"User prompt: {user_prompt}")
 
-    # Generate Content
-    generate_content(client, messages, verbose_flag)
+    # Generate Content BY Looping
+    run_count = 0
+    while run_count < MAX_RUN_COUNT:
+        run_count += 1
+
+        try:
+            final_response = generate_content(client, messages, verbose_flag)
+            if final_response:
+                print("Final response:")
+                print(final_response)
+                break
+        except Exception as e:
+            print(f"Error in generate_content: {e}")
+
+    if run_count == MAX_RUN_COUNT:
+        print(f"Loop has reached Maximum Iterations: {MAX_RUN_COUNT}. Terminating Prompt.")
+        sys.exit(1)
 
 
 def generate_content(client, messages, verbose):
@@ -58,6 +74,11 @@ def generate_content(client, messages, verbose):
         )
     )
 
+    # Check the Candidate property and add content to Messages
+    if response.candidates:
+        for candidate in response.candidates:
+            messages.append(candidate.content)
+
     # Print Response
     # Verbose Flag Details
     if verbose:
@@ -66,7 +87,7 @@ def generate_content(client, messages, verbose):
     
     # Check for Function Calls and Execute
     if not response.function_calls:
-        print(response.text)
+        return response.text
 
     # Get Function Calls and Print Where Necessary
     function_responses = []
@@ -79,7 +100,10 @@ def generate_content(client, messages, verbose):
         function_responses.append(function_response.parts[0])
     
     if not function_responses:
-        raise Exception("No function responses generated, exiting.")            
+        raise Exception("No function responses generated, exiting.")
+    
+    # Append Response as new User Message
+    messages.append(types.Content(role='user', parts=function_responses),)
 
 
 if __name__ == "__main__":
