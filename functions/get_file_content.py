@@ -40,8 +40,9 @@ schema_get_file_content = types.FunctionDeclaration(
         properties={
             "file_path": types.Schema(
                 type=types.Type.STRING,
-                description="The file path to read from, relative to the working directory. If not provided, provide message asking user to include this as a required field.",
+                description="The file path to read from, relative to the working directory.",
             ),
         },
+        required=["file_path"],
     ),
 )
