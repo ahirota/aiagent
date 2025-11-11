@@ -16,12 +16,15 @@ def get_file_content(working_directory, file_path):
 
     # Read the File and Return Content as a string
     # Truncating at Maximum Characters (Default 10,000) and appending a note
-    truncated = os.path.getsize(abs_working_file) > MAX_CHARS
+    try:
+        truncated = os.path.getsize(abs_working_file) > MAX_CHARS
 
-    with open(abs_working_file, "r") as f:
-        file_content_string = f.read(MAX_CHARS)
+        with open(abs_working_file, "r") as f:
+            file_content_string = f.read(MAX_CHARS)
+            
+        if truncated:
+            file_content_string += f'[...File "{file_path}" truncated at 10000 characters].'
 
-    if truncated:
-        file_content_string += f'[...File "{file_path}" truncated at 10000 characters].'
-
-    return file_content_string
+        return file_content_string
+    except Exception as e:
+        return f'Error reading file "{file_path}": {e}'
